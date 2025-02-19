@@ -35,6 +35,12 @@ IMAGE_NAME := lws
 IMAGE_REPO := $(IMAGE_REGISTRY)/$(IMAGE_NAME)
 IMG ?= $(IMAGE_REPO):$(GIT_TAG)
 
+BASE_IMAGE=m.daocloud.io/gcr.io/distroless/static:nonroot 
+BUILDER_IMAGE=m.daocloud.io/docker.io/golang:1.23
+IMAGE_REGISTRY=release-ci.daocloud.io/yankay-personal/k8s-staging-lws
+IMAGE_REPO := $(IMAGE_REGISTRY)/$(IMAGE_NAME)
+IMG ?= $(IMAGE_REPO):$(GIT_TAG)
+
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 BASE_IMAGE ?= gcr.io/distroless/static:nonroot
@@ -123,6 +129,10 @@ KIND = $(shell pwd)/bin/kind
 .PHONY: kind
 kind:
 	@GOBIN=$(PROJECT_DIR)/bin GO111MODULE=on go install sigs.k8s.io/kind@v0.26.0
+
+.PHONY: kind-image-load
+kind-image-load:
+	kind load docker-image "$(IMG)"
 
 .PHONY: kind-image-build
 kind-image-build: PLATFORMS=linux/amd64

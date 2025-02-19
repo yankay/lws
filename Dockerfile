@@ -6,6 +6,9 @@ FROM --platform=${BUILDPLATFORM} ${BUILDER_IMAGE} AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
+RUN go env -w GO111MODULE=on
+RUN go env -w GOPROXY=https://goproxy.cn,direct
+
 WORKDIR /workspace
 # cache deps before building so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
