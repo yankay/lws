@@ -11,7 +11,10 @@ Follow the step-by-step guide on how to install LWS. [View installation guide](h
 We use LeaderWorkerSet to deploy two vLLM model replicas, and each vLLM replica has 2 pods (pipeline_parallel_size=2) and 8 GPUs per pod (tensor_parallel_size=8). 
 The leader pod runs the Ray head and the http server, with a ClusterIP Service exposing the port, while the workers run the Ray workers.
 
+Before running the commands below, modify `lws.yaml` by replacing `<your-hf-token>` with your Hugging Face token. Ensure the token has access to [meta-llama/Meta-Llama-3.1-405B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct). 
+
 ```shell
+kubectl apply -f ../base/configmap.yaml
 kubectl apply -f lws.yaml
 ```
 

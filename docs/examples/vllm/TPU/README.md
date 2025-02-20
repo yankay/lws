@@ -11,7 +11,10 @@ Follow the step-by-step guide on how to install LWS. [View installation guide](h
 In this example, we use LeaderWorkerSet to deploy two vLLM server replicas to serve the llama3-70b model on two v5e-16 TPU slices. You can view how to create a cluster with multiple TPU slices [here](https://cloud.google.com/kubernetes-engine/docs/how-to/tpus). Since the v5e-16 TPU slice has four hosts, so each vLLM replica will have 4 workers, and each worker will consume 4 TPUs (with tensor_parallel_size=16). 
 The leader pod runs the Ray head and the vLLM server, with a ClusterIP Service exposing the port, while the workers run the Ray workers.
 
+Before running the commands below, modify `lws.yaml` by replacing `<your-hf-token>` with your Hugging Face token. Ensure the token has access to [meta-llama/Meta-Llama-3-70B](https://huggingface.co/meta-llama/Meta-Llama-3-70B). 
+
 ```shell
+kubectl apply -f ../base/configmap.yaml
 kubectl apply -f lws.yaml
 ```
 

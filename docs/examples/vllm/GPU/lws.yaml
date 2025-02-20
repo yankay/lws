@@ -14,7 +14,7 @@ spec:
       spec:
         containers:
           - name: vllm-leader
-            image: <image-built-from-dockerfile>
+            image: docker.io/vllm/vllm-openai:latest
             env:
               - name: HUGGING_FACE_HUB_TOKEN
                 value: <your-hf-token>
@@ -39,9 +39,16 @@ spec:
               initialDelaySeconds: 15
               periodSeconds: 10
             volumeMounts:
+              - mountPath: "/vllm-workspace"
+                name: scripts-volume
+                readOnly: true            
               - mountPath: /dev/shm
                 name: dshm
         volumes:
+        - name: scripts-volume
+          configMap:
+            defaultMode: 0700
+            name: vllm-multihost-config        
         - name: dshm
           emptyDir:
             medium: Memory
@@ -50,7 +57,7 @@ spec:
       spec:
         containers:
           - name: vllm-worker
-            image: <image-built-from-dockerfile>
+            image: docker.io/vllm/vllm-openai:latest
             command:
               - sh
               - -c
@@ -67,9 +74,16 @@ spec:
               - name: HUGGING_FACE_HUB_TOKEN
                 value: <your-hf-token>
             volumeMounts:
+              - mountPath: "/vllm-workspace"
+                name: scripts-volume
+                readOnly: true            
               - mountPath: /dev/shm
                 name: dshm   
         volumes:
+        - name: scripts-volume
+          configMap:
+            defaultMode: 0700
+            name: vllm-multihost-config       
         - name: dshm
           emptyDir:
             medium: Memory
