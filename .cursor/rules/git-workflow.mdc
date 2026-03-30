@@ -1,0 +1,9 @@
+---
+description: Git workflow rules for contributing changes
+alwaysApply: true
+---
+# Git Workflow
+- **Never push directly to upstream** (master/main branch)
+- Always create a **new branch** for changes
+- Submit changes via **Pull Request (PR)**
+- Branch naming: use descriptive names like `fix/xxx`, `feat/xxx`, `chore/xxx`

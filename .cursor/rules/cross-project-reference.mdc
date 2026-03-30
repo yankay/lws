@@ -1,0 +1,31 @@
+---
+description: Cross-reference related K8s projects when submitting PRs or Issues
+alwaysApply: true
+---
+
+# Cross-Project Reference Check
+
+When preparing a **PR** or **Issue** for this project (lws), always check the following related projects for similar issues, solutions, or PRs:
+
+- [kueue](https://github.com/kubernetes-sigs/kueue) — Job queueing / admission control
+- [jobset](https://github.com/kubernetes-sigs/jobset) — Multi-template job orchestration
+- [kubernetes](https://github.com/kubernetes/kubernetes) — Core Kubernetes
+
+## What to look for
+
+1. **Similar issues**: Has the same bug or feature request been filed in these projects?
+2. **Similar solutions**: Has a related problem already been solved? Can we reuse the approach?
+3. **Similar PRs**: Are there open or merged PRs tackling comparable changes?
+
+## How to search
+
+Use `gh search issues` / `gh search prs` or browse the GitHub UI for each repo. Include relevant findings (links) in the PR/Issue description to provide context for reviewers.
+
+## Example workflow
+
+```bash
+# Search for related issues across the three projects
+gh search issues "your keywords" --repo kubernetes-sigs/kueue --repo kubernetes-sigs/jobset --repo kubernetes/kubernetes
+# Search for related PRs
+gh search prs "your keywords" --repo kubernetes-sigs/kueue --repo kubernetes-sigs/jobset --repo kubernetes/kubernetes
+```

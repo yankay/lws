@@ -1,0 +1,7 @@
+---
+description: Language preference for communication
+alwaysApply: true
+---
+# Language Preference
+- Reply to the user in **Chinese** (中文)
+- Use **English** for: GitHub issues, code, PR comments/reviews, and commit messages

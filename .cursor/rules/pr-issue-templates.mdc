@@ -1,0 +1,30 @@
+---
+description: PR and Issue submission templates for kubernetes-sigs/kubespray
+alwaysApply: true
+---
+# PR & Issue Templates
+Always follow the official templates when submitting PRs or Issues to kubernetes-sigs/kubespray.
+## Pull Request Template
+Reference: https://github.com/kubernetes-sigs/kubespray/blob/master/.github/PULL_REQUEST_TEMPLATE.md
+Every PR must include:
+**1. PR Kind** (uncomment exactly one):
+```
+/kind api-change /kind bug /kind cleanup /kind design /kind documentation /kind failing-test /kind feature /kind flake
+```
+**2. Required sections:**
+- **What this PR does / why we need it**: Clear description of the change and motivation
+- **Which issue(s) this PR fixes**: Use `Fixes #<issue>` to auto-close linked issues
+- **Special notes for your reviewer**: Any context reviewers need
+- **Does this PR introduce a user-facing change?**: Include a `release-note` block:
+  ```release-note
+  <description or NONE>
+  ```
+## Issue Templates
+Reference: https://github.com/kubernetes-sigs/kubespray/tree/master/.github/ISSUE_TEMPLATE
+
+Available templates:
+- **bug-report.yaml** — for reporting bugs
+- **enhancement.yaml** — for feature requests / enhancements
+- **failing-test.yaml** — for CI/test failures
+
+Use the appropriate template; do not file a blank issue when a template matches.

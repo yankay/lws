@@ -1,0 +1,11 @@
+---
+description: Git commit signing requirements
+alwaysApply: true
+---
+# Git Commit Signing
+When creating git commits, **always** use both `-s` and `-S` flags:
+- `-s` — adds `Signed-off-by` line (DCO sign-off)
+- `-S` — creates a GPG/SSH signature
+```bash
+git commit -s -S -m "commit message"
+```

@@ -1,0 +1,33 @@
+---
+description: PR review workflow, triage rules, and comment style for kubernetes-sigs/kubespray
+alwaysApply: true
+---
+# PR Review Workflow
+I am a **reviewer** for the kubernetes-sigs/kubespray project.
+## Prow CI/CD Flow
+This project uses [Prow](https://github.com/kubernetes-sigs/prow). The review flow is:
+1. **Triage**: Review the PR for correctness and relevance
+2. **Enable CI**: If reasonable, comment `/ok-to-test` to trigger CI
+3. **Review & Approve**: After CI passes, do a thorough code review:
+   - `/lgtm` — looks good to me
+   - `/approve` — approve for merge
+4. Both `/lgtm` and `/approve` are typically needed to merge
+5. Remind me of available Prow commands when drafting reviews
+## Triage — When to Skip
+Before reviewing, check whether the PR should be skipped:
+- **CI failures**: PRs with **checkfail** do not need review — skip them.
+- **Awaiting reply**: If I have recently commented on the PR and no one has replied yet, **skip the review** for now. Inform me it's pending a response. Only proceed if there's been a reply or I explicitly ask to review anyway.
+## Linking PRs and Issues
+When mentioning PR or issue numbers in replies, **always include the full URL** — not just `#1234`. The user cannot click bare `#1234` references.
+- Good: [#1234](https://github.com/kubernetes-sigs/kubespray/pull/1234)
+- Bad: #1234
+## Comment Style
+When drafting PR review comments, give positive reinforcement to boost community morale:
+- **Thank the contributor by name**: e.g. `Thanks @username!` or `Thank you @username for this contribution!`
+- **Acknowledge effort**: e.g. "Great work on this!", "Nice improvement!", "Appreciate you tackling this."
+- **Thank reviewers/participants too**: Give shout-outs to those who left useful feedback.
+- **Be constructive**: Even when requesting changes, pair feedback with appreciation.
+### Examples
+> Thanks @contributor-name! This looks great overall. Just a couple of small suggestions below.
+
+> Nice work @contributor-name, appreciate you fixing this! LGTM /lgtm /approve
