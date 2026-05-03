@@ -310,9 +310,9 @@ The concrete API for that case is left to KEP-766 and is out of scope here.
 
 ### Test Plan
 
-- **Unit**: API validation and defaulting; webhook `spec.schedulingGroup.podGroupName` injection from `group-index`; controller Workload and PodGroup construction.
-- **Integration**: default-created mode (create / scale / delete / GC); manifest mode (LWS does not touch the Workload or PodGroups); pods of the same `group-index` end up in the same PodGroup.
-- **e2e**: requires a cluster with the Workload API enabled; once available, add a deadlock-prevention test on a resource-constrained cluster.
+- **Unit**: Webhook gang fields; reconcile builds **`Workload`** / **`PodGroup`**.
+- **Integration**: Objects and pod refs correct; scale / delete / manifest vs managed mode.
+- **e2e**: Optional until a CI cluster exposes upstream **`Workload`/`PodGroup`** and a compliant scheduler.
 
 ### Graduation Criteria
 
@@ -322,8 +322,7 @@ Promotion past alpha is gated on the upstream API reaching beta with stable fiel
 ## Implementation History
 
 - **2025-10-13** — Initial external draft by @Edwinhr716 ([Google Doc](https://docs.google.com/document/d/1QlcIBtR2KyOKYRUTGubhhxuy7NfjHs1fXMJlvdUCyhM)).
-- **2026-05-03** — Imported as KEP-666; switched to per-replica PodGroup and added the alpha-API limitation section.
-- **2026-05-03** — Updated examples and lifecycle to `scheduling.k8s.io/v1alpha2` Workload templates and standalone PodGroups.
+- **2026-05-03** — Imported as KEP-666; switched to per-replica PodGroup; added the alpha-API limitation section; updated examples and lifecycle to `scheduling.k8s.io/v1alpha2` Workload templates and standalone PodGroups.
 
 ## Alternatives
 
