@@ -115,6 +115,7 @@ LWS only injects each pod's `spec.schedulingGroup.podGroupName` via the pod webh
 LWS does not create, validate, update, or delete the Workload or PodGroups in this mode.
 
 The user is responsible for keeping the PodGroup count aligned with LWS `replicas`, pointing each PodGroup at the intended Workload `podGroupTemplates[]` entry, and choosing a `MinCount` that matches the workload's startup semantics.
+Because the user cannot pre-provision PodGroups for surge indices, the LWS validating webhook rejects `maxSurge != 0` when `podGroupNamePrefix` is set.
 
 #### Default-created Lifecycle
 
@@ -122,7 +123,7 @@ When `spec.schedulingPolicy.gang` is set and templates do not point at external 
 
 - **Workload.Name** — `<lws-name>`
 - **Workload.PodGroupTemplates** — one gang template used by all LWS replica PodGroups
-- **PodGroups** — one standalone PodGroup per LWS replica (`replicas` PodGroups in total)
+- **PodGroups** — one standalone PodGroup per LWS replica (`replicas` PodGroups at rest, transiently `replicas + maxSurge` during a rolling update)
 - **PodGroup.Name** — `<lws-name>-<group-index>` (i.e. the LWS-managed mode behaves as if `podGroupNamePrefix` defaulted to the LWS name; the naming rule is identical in both modes)
 - **PodGroup.Spec.SchedulingPolicy.Gang.MinCount** — defaults to LWS `size`
 
@@ -132,11 +133,11 @@ This matches the per-replica boundary chosen by [KEP-407][kep407].
 #### Lifecycle Management
 
 The Workload and PodGroups are created before the leader StatefulSet, so each PodGroup exists by the time pods that reference it are created.
+The same ordering applies to `spec.Replicas` scale-up and to `maxSurge`-driven bursts of `sts.spec.replicas`: PodGroup `<lws-name>-<i>` must exist before the pod with `group-index = i` is created, and surge PodGroups are reclaimed only after their leader pod is gone (see [KEP-407][kep407] for the same requirement on third-party providers).
 The LWS object is the controller owner of the Workload and PodGroups, so they are GC'd on LWS deletion.
-All replicas of an LWS share a single `podGroupTemplates[]` entry (`name: replica`), so the Workload object is created once and never mutated.
-On replica scale up/down, the controller only creates or deletes standalone PodGroup objects.
+All replicas of an LWS share a single `podGroupTemplates[]` entry (`name: replica`), so the Workload object is created once and never mutated; on replica scale up/down or surge/reclaim the controller only creates or deletes standalone PodGroup objects.
 This also matches the upstream constraint that `Workload.spec.podGroupTemplates` is immutable in `scheduling.k8s.io/v1alpha2`.
-PodGroups are reused across rolling updates, since they are keyed by `group-index`, not by revision.
+PodGroups are reused across rolling updates, since they are keyed by `group-index`, not by revision; when `Size` or `MinCount` changes, the controller updates `PodGroup.spec.schedulingPolicy.gang.minCount` in place.
 
 #### Status Propagation
 
