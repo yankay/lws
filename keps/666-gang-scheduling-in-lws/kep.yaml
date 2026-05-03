@@ -1,0 +1,20 @@
+title: Gang Scheduling in LWS
+kep-number: 666
+authors:
+  - Edwinhr716
+  - yankay
+status: provisional
+creation-date: 2025-10-13
+reviewers:
+  - ahg-g
+  - kerthcet
+  - ardaguclu
+  - JesseStutler
+approvers:
+  - ahg-g
+  - kerthcet
+
+stage: alpha
+
+latest-milestone: "v0.9.0"
+
