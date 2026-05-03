@@ -104,14 +104,14 @@ type GangSchedulingPolicy struct {
 ```
 
 LWS validates `MinCount` as a positive integer no larger than `LeaderWorkerTemplate.Size`.
-As a compatibility escape hatch, `MinCount < Size` is allowed for staged startup; for example, `LeaderReady` users can set `MinCount = 1` so the leader can be admitted before workers are created.
+`MinCount = 1` is allowed as an escape hatch — it is equivalent to disabling gang scheduling for this LWS, since any single pod satisfies the gang. This can be useful for `LeaderReady` users who want the leader to be admitted unconditionally; the alpha API does not support a true two-phase (leader-then-workers) gang.
 
 ### Lifecycle of Workload and PodGroup Objects
 
 #### Manifest Lifecycle
 
 The user creates and owns the Workload and PodGroup objects.
-LWS only injects each pod's `spec.schedulingGroup.podGroupName` via the pod webhook, derived as `<base>-<group-index>` where `<base>` is taken from the LWS gang policy.
+LWS only injects each pod's `spec.schedulingGroup.podGroupName` via the pod webhook, derived as `<prefix>-<group-index>` from `podGroupNamePrefix`.
 LWS does not create, validate, update, or delete the Workload or PodGroups in this mode.
 
 The user is responsible for keeping the PodGroup count aligned with LWS `replicas`, pointing each PodGroup at the intended Workload `podGroupTemplates[]` entry, and choosing a `MinCount` that matches the workload's startup semantics.
@@ -120,10 +120,10 @@ The user is responsible for keeping the PodGroup count aligned with LWS `replica
 
 When `spec.schedulingPolicy.gang` is set and templates do not point at external PodGroups, LWS creates:
 
-- **Workload.Name** — `lws-workload-<lws-name>`
+- **Workload.Name** — `<lws-name>`
 - **Workload.PodGroupTemplates** — one gang template used by all LWS replica PodGroups
 - **PodGroups** — one standalone PodGroup per LWS replica (`replicas` PodGroups in total)
-- **PodGroup.Name** — `lws-podgroup-<lws-name>-<group-index>`
+- **PodGroup.Name** — `<lws-name>-<group-index>` (i.e. the LWS-managed mode behaves as if `podGroupNamePrefix` defaulted to the LWS name; the naming rule is identical in both modes)
 - **PodGroup.Spec.SchedulingPolicy.Gang.MinCount** — defaults to LWS `size`
 
 A replica is the smallest self-contained unit of an LWS workload, and replicas are independent of each other; using one PodGroup per replica ensures pods of one replica gang-schedule together while a starved replica does not block the others.
@@ -133,8 +133,16 @@ This matches the per-replica boundary chosen by [KEP-407][kep407].
 
 The Workload and PodGroups are created before the leader StatefulSet, so each PodGroup exists by the time pods that reference it are created.
 The LWS object is the controller owner of the Workload and PodGroups, so they are GC'd on LWS deletion.
-On replica scale up/down, the controller creates or deletes standalone PodGroup objects instead of mutating the Workload, because the Workload is a static scheduling-policy template in `scheduling.k8s.io/v1alpha2`.
+All replicas of an LWS share a single `podGroupTemplates[]` entry (`name: replica`), so the Workload object is created once and never mutated.
+On replica scale up/down, the controller only creates or deletes standalone PodGroup objects.
+This also matches the upstream constraint that `Workload.spec.podGroupTemplates` is immutable in `scheduling.k8s.io/v1alpha2`.
 PodGroups are reused across rolling updates, since they are keyed by `group-index`, not by revision.
+
+#### Status Propagation
+
+The scheduler reports per-PodGroup state via `PodGroup.status.conditions[PodGroupScheduled]` (see [KEP-5832][podgroup-kep]).
+For alpha, LWS does not aggregate this into LWS status — users observe per-replica scheduling state directly on the PodGroup objects.
+Beta will surface unschedulable PodGroups on the LWS object (condition and/or event) so users can diagnose without listing PodGroups separately.
 
 ### Examples
 
@@ -212,7 +220,7 @@ spec:
   replicas: 4
   schedulingPolicy:
     gang:
-      # Base "my-lws-gang"; webhook appends "-<group-index>" and writes
+      # Prefix "my-lws-gang"; webhook appends "-<group-index>" and writes
       # pod.spec.schedulingGroup.podGroupName.
       podGroupNamePrefix: my-lws-gang
   leaderWorkerTemplate:
@@ -244,7 +252,7 @@ The Workload that LWS creates:
 apiVersion: scheduling.k8s.io/v1alpha2
 kind: Workload
 metadata:
-  name: lws-workload-leaderworkerset-sample
+  name: leaderworkerset-sample
   ownerReferences:
     - apiVersion: leaderworkerset.x-k8s.io/v1
       kind: LeaderWorkerSet
@@ -264,7 +272,7 @@ The PodGroups that LWS creates:
 apiVersion: scheduling.k8s.io/v1alpha2
 kind: PodGroup
 metadata:
-  name: lws-podgroup-leaderworkerset-sample-0
+  name: leaderworkerset-sample-0
   ownerReferences:
     - apiVersion: leaderworkerset.x-k8s.io/v1
       kind: LeaderWorkerSet
@@ -273,7 +281,7 @@ metadata:
 spec:
   podGroupTemplateRef:
     workload:
-      workloadName: lws-workload-leaderworkerset-sample
+      workloadName: leaderworkerset-sample
       podGroupTemplateName: replica
   schedulingPolicy:
     gang:
@@ -282,7 +290,7 @@ spec:
 apiVersion: scheduling.k8s.io/v1alpha2
 kind: PodGroup
 metadata:
-  name: lws-podgroup-leaderworkerset-sample-1
+  name: leaderworkerset-sample-1
   ownerReferences:
     - apiVersion: leaderworkerset.x-k8s.io/v1
       kind: LeaderWorkerSet
@@ -291,7 +299,7 @@ metadata:
 spec:
   podGroupTemplateRef:
     workload:
-      workloadName: lws-workload-leaderworkerset-sample
+      workloadName: leaderworkerset-sample
       podGroupTemplateName: replica
   schedulingPolicy:
     gang:
@@ -304,11 +312,10 @@ In general, `replicas: N, size: M` produces **N PodGroups, M pods each**.
 
 ### Limitations of the alpha Workload and PodGroup APIs
 
-`MinCount` only enforces "M pods within this PodGroup co-schedule"; it has no notion of per-role minimums.
-This is enough for the LWS-level case (one replica = one PodGroup, all M pods co-schedule).
-It is **not** enough for the [DisaggregatedSet][kep766] case, where *"≥1 prefill replica AND ≥1 decode replica must be ready simultaneously"*.
-Lumping prefill and decode into one PodGroup with `MinCount = sum` does not help — the scheduler may satisfy `MinCount` with M prefill and zero decode pods.
-The concrete API for that case is left to KEP-766 and is out of scope here.
+The alpha2 PodGroup gang policy exposes a single `MinCount` scalar — there is no notion of per-role or per-subgroup minimums within a PodGroup.
+This is sufficient for the LWS-level case (one replica = one PodGroup, all M pods co-schedule).
+It is **not** sufficient for the [DisaggregatedSet][kep766] case, which needs *"≥1 prefill replica AND ≥1 decode replica ready simultaneously"* — a constraint that cannot be expressed by any single `MinCount` value.
+The natural upstream path is hierarchical PodGroups, listed under Future Plans in [KEP-5832][podgroup-kep]; KEP-766 will track the LWS-side design once that lands.
 
 ### Test Plan
 
