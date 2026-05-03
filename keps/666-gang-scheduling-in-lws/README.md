@@ -62,7 +62,7 @@ This KEP adds a parallel, upstream-native path for clusters that have the `sched
 
 LWS gains a new `spec.schedulingPolicy.gang` field.
 When set, LWS creates a `scheduling.k8s.io/v1alpha2` Workload containing a gang PodGroup template and one standalone `PodGroup` object per LWS replica.
-Each PodGroup's `MinCount` defaults to `LeaderWorkerTemplate.Size`, so all pods of a replica must co-schedule.
+Each PodGroup's `MinCount` defaults to `LeaderWorkerTemplate.Size`, so by default all pods of a replica co-schedule.
 The pod webhook sets each pod's `spec.schedulingGroup.podGroupName` based on the pod's `leaderworkerset.sigs.k8s.io/group-index` label.
 
 ### User Stories
@@ -97,8 +97,9 @@ type GangSchedulingPolicy struct {
     PodGroupNamePrefix *string `json:"podGroupNamePrefix,omitempty"`
 
     // MinCount is the minimum number of pods within a single PodGroup that
-    // must be co-scheduled. Defaults to LeaderWorkerTemplate.Size; values
-    // smaller than Size weaken the per-replica gang guarantee.
+    // must be co-scheduled. Defaults to LeaderWorkerTemplate.Size.
+    // Setting MinCount < Size allows partial co-scheduling (e.g. workers
+    // joining a running leader).
     // +optional
     MinCount *int32 `json:"minCount,omitempty"`
 }
