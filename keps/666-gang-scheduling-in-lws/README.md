@@ -62,7 +62,7 @@ This KEP adds a parallel, upstream-native path for clusters that have the `sched
 
 LWS gains a new `spec.schedulingPolicy.gang` field.
 When set, LWS creates a `scheduling.k8s.io/v1alpha2` Workload containing a gang PodGroup template and one standalone `PodGroup` object per LWS replica.
-Each PodGroup's `MinCount` defaults to `LeaderWorkerTemplate.Size`, so by default all pods of a replica co-schedule.
+Each PodGroup's `MinCount` defaults to `LeaderWorkerTemplate.Size`, so all pods of a replica must co-schedule by default.
 The pod webhook sets each pod's `spec.schedulingGroup.podGroupName` based on the pod's `leaderworkerset.sigs.k8s.io/group-index` label.
 
 ### User Stories
@@ -98,12 +98,13 @@ type GangSchedulingPolicy struct {
 
     // MinCount is the minimum number of pods within a single PodGroup that
     // must be co-scheduled. Defaults to LeaderWorkerTemplate.Size.
-    // Setting MinCount < Size allows partial co-scheduling (e.g. workers
-    // joining a running leader).
     // +optional
     MinCount *int32 `json:"minCount,omitempty"`
 }
 ```
+
+LWS validates `MinCount` as a positive integer no larger than `LeaderWorkerTemplate.Size`.
+As a compatibility escape hatch, `MinCount < Size` is allowed for staged startup; for example, `LeaderReady` users can set `MinCount = 1` so the leader can be admitted before workers are created.
 
 ### Lifecycle of Workload and PodGroup Objects
 
@@ -113,7 +114,7 @@ The user creates and owns the Workload and PodGroup objects.
 LWS only injects each pod's `spec.schedulingGroup.podGroupName` via the pod webhook, derived as `<base>-<group-index>` where `<base>` is taken from the LWS gang policy.
 LWS does not create, validate, update, or delete the Workload or PodGroups in this mode.
 
-The user is responsible for keeping the PodGroup count aligned with LWS `replicas`, pointing each PodGroup at the intended Workload `podGroupTemplates[]` entry, and (typically) setting per-PodGroup `MinCount = size`.
+The user is responsible for keeping the PodGroup count aligned with LWS `replicas`, pointing each PodGroup at the intended Workload `podGroupTemplates[]` entry, and choosing a `MinCount` that matches the workload's startup semantics.
 
 #### Default-created Lifecycle
 
