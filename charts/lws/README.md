@@ -8,6 +8,7 @@
     - [Installing the chart](#installing-the-chart)
         - [Install chart using Helm v3.0+](#install-chart-using-helm-v30)
         - [Verify that controller pods are running properly.](#verify-that-controller-pods-are-running-properly)
+        - [Upgrading the chart](#upgrading-the-chart)
     - [Configuration](#configuration)
 <!-- /toc -->
 
@@ -46,6 +47,17 @@ NAME                          READY   UP-TO-DATE   AVAILABLE   AGE
 lws-system-controller-manager   1/1     1            1           14s
 ```
 
+##### Upgrading the chart
+
+Helm installs CRDs during `helm install`, but does not automatically upgrade CRDs
+from the chart `crds/` directory during `helm upgrade`. See the
+[installation guide](https://lws.sigs.k8s.io/docs/installation/#upgrade-by-helm)
+for the recommended upgrade flow.
+
+If you are upgrading from LWS `v0.7.0` or earlier to `v0.8.0` or later, see the
+[troubleshooting guide](https://lws.sigs.k8s.io/docs/troubleshooting/#4-leaderworkerset-crd-missing-after-helm-upgrade)
+before running `helm upgrade`.
+
 ##### Cert Manager
 
 LWS has support for third-party certificates.
@@ -70,8 +82,8 @@ editor/viewer/admin ClusterRoles and validating webhook, set
 
 Helm installs CRDs during `helm install`, but does not install newly added CRDs
 during `helm upgrade`. Before upgrading an existing LWS Helm release to a chart
-version that introduces DisaggregatedSet, apply the new CRD from the repository
-root:
+version that introduces DisaggregatedSet, follow the safe Helm upgrade flow
+above or apply the new CRD from the repository root:
 
 ```bash
 kubectl apply --server-side \

@@ -64,3 +64,36 @@ This issue occurs because StatefulSet names exceeding 57 characters prevent pods
 ### Solution
 
 The name limit for LWS objects is calculated as `(51 - int(replicas / 10))`. This is because the worker StatefulSet name grows by one character for replicas above 9, another character for replicas above 99, and so on. Ensure that the LWS object name adheres to this limit to avoid issues.
+
+---
+
+## 4. LeaderWorkerSet CRD Missing After Helm Upgrade
+
+When upgrading an LWS Helm release from `v0.7.0` or earlier to `v0.8.0` or
+later, the `leaderworkersets.leaderworkerset.x-k8s.io` CRD might be deleted.
+If this happens, existing LeaderWorkerSet objects are also removed by Kubernetes
+garbage collection.
+
+### Cause
+
+LWS charts before `v0.8.0` stored the LeaderWorkerSet CRD in the regular Helm
+templates. Starting with `v0.8.0`, the CRDs are stored in the chart `crds/`
+directory. During an upgrade across this layout change, Helm can see the CRD in
+the old release manifest but not in the new rendered templates, then treat it as
+a deleted resource.
+
+### Solution
+
+Before upgrading a Helm installation from `v0.7.0` or earlier to `v0.8.0` or
+later, run the helper script before `helm upgrade`:
+
+```shell
+CHART_VERSION=0.9.0
+hack/prepare-helm-legacy-crd-upgrade.sh --chart-version "$CHART_VERSION"
+```
+
+Then run `helm upgrade` with the same `--values` and `--set` options used by the
+existing release.
+
+If the CRD was already deleted, restore the LeaderWorkerSet resources from your
+cluster backup, then run the helper script before the next upgrade attempt.

@@ -9,6 +9,9 @@ description: >
 <!-- toc -->
 - [Before you begin](#before-you-begin)
 - [Install a released version](#install-a-released-version)
+  - [Install by kubectl](#install-by-kubectl)
+  - [Install by Helm](#install-by-helm)
+  - [Upgrade by Helm](#upgrade-by-helm)
   - [Uninstall](#uninstall)
 - [Install the latest development version](#install-the-latest-development-version)
   - [Uninstall](#uninstall-1)
@@ -72,6 +75,30 @@ helm install lws https://github.com/kubernetes-sigs/lws/releases/download/$VERSI
   --create-namespace \
   --wait --timeout 300s
 ```
+
+### Upgrade by Helm
+
+Apply CRDs from the target chart before running `helm upgrade`:
+
+```shell
+CHART=oci://registry.k8s.io/lws/charts/lws
+CHART_VERSION=0.9.0
+
+# helm show crds can concatenate CRD YAML without document separators.
+helm show crds "$CHART" --version "$CHART_VERSION" \
+  | awk '$0 == "apiVersion: apiextensions.k8s.io/v1" { if (seen++) print "---" } { print }' \
+  | kubectl apply --server-side --force-conflicts -f -
+
+helm upgrade lws "$CHART" \
+  --version "$CHART_VERSION" \
+  --namespace lws-system \
+  --wait --timeout 300s
+```
+
+Include any `--values` or `--set` options used by the existing release.
+
+If you are upgrading from LWS `v0.7.0` or earlier to `v0.8.0` or later, see
+[troubleshooting](/docs/troubleshooting/#4-leaderworkerset-crd-missing-after-helm-upgrade).
 
 ### Uninstall
 
