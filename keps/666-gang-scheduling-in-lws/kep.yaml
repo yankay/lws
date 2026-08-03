@@ -1,0 +1,35 @@
+title: Workload-Aware Scheduling for LWS and DisaggregatedSet
+kep-number: 666
+authors:
+  - Edwinhr716
+  - yankay
+status: provisional
+creation-date: 2025-10-13
+reviewers:
+  - ahg-g
+  - kerthcet
+  - ardaguclu
+  - JesseStutler
+approvers:
+  - ahg-g
+  - kerthcet
+  - Edwinhr716
+
+see-also:
+  - "/keps/407-gang-scheduling"
+  - "/keps/766-DisaggregatedSet"
+  - "/keps/846-disaggregatedset-slices"
+  - "/keps/848-disaggregatedset-placement-policy"
+  - "https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/6089-was-controller-apis"
+  - "https://github.com/kubernetes-sigs/jobset/pull/1253"
+  - "https://github.com/kubernetes-sigs/lws/issues/892"
+  - "https://github.com/kubernetes-sigs/lws/issues/893"
+  - "https://github.com/kubernetes-sigs/lws/issues/894"
+
+stage: alpha
+latest-milestone: "v0.9.0"
+
+feature-gates:
+  - name: WorkloadAwareScheduling
+  - name: CompositePodGroupScheduling
+disable-supported: true
