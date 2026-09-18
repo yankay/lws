@@ -24,7 +24,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -147,13 +149,19 @@ func TestVolcanoProvider_CreatePodGroupIfNotExists(t *testing.T) {
 			},
 			leaderPod: testLeaderPod3,
 			existingPG: &volcanov1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-lws-0-xyz789", Namespace: "default"},
-				Spec:       volcanov1beta1.PodGroupSpec{MinMember: 3},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-lws-0-xyz789", Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(testLeaderPod3, corev1.SchemeGroupVersion.WithKind("Pod"))},
+				},
+				Spec: volcanov1beta1.PodGroupSpec{MinMember: 3},
 			},
 			expectError: false,
 			expectedPG: &volcanov1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-lws-0-xyz789", Namespace: "default"},
-				Spec:       volcanov1beta1.PodGroupSpec{MinMember: 3},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-lws-0-xyz789", Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(testLeaderPod3, corev1.SchemeGroupVersion.WithKind("Pod"))},
+				},
+				Spec: volcanov1beta1.PodGroupSpec{MinMember: 3},
 			},
 		},
 		{
@@ -261,6 +269,141 @@ func TestVolcanoProvider_CreatePodGroupIfNotExists(t *testing.T) {
 			if diff := cmp.Diff(tt.expectedPG, &actualPG, opts...); diff != "" {
 				t.Errorf("PodGroup mismatch (-want +got):\n%s", diff)
 			}
+		})
+	}
+}
+
+func TestVolcanoProvider_ExistingPodGroup(t *testing.T) {
+	leader := createTestLeaderPod("test-lws-0", "default", "test-lws", "0", "revision")
+	lws := &leaderworkerset.LeaderWorkerSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-lws", Namespace: "default"},
+		Spec: leaderworkerset.LeaderWorkerSetSpec{
+			LeaderWorkerTemplate: leaderworkerset.LeaderWorkerTemplate{Size: ptr.To[int32](1)},
+		},
+	}
+	tests := []struct {
+		name        string
+		mutate      func(*volcanov1beta1.PodGroup)
+		wantError   bool
+		wantWaiting bool
+	}{
+		{
+			name: "current leader owns the PodGroup",
+		},
+		{
+			name: "previous leader owns the PodGroup before deletion starts",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.OwnerReferences[0].UID = "previous-leader-uid"
+			},
+			wantError: true, wantWaiting: true,
+		},
+		{
+			name: "current leader owns a terminating PodGroup",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.DeletionTimestamp = ptr.To(metav1.Now())
+				pg.Finalizers = []string{"test.lws.sigs.k8s.io/hold-podgroup"}
+			},
+			wantError: true, wantWaiting: true,
+		},
+		{
+			name: "previous leader owns a terminating PodGroup",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.OwnerReferences[0].UID = "previous-leader-uid"
+				pg.DeletionTimestamp = ptr.To(metav1.Now())
+				pg.Finalizers = []string{"test.lws.sigs.k8s.io/hold-podgroup"}
+			},
+			wantError: true, wantWaiting: true,
+		},
+		{
+			name: "PodGroup has no owner",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.OwnerReferences = nil
+			},
+			wantError: true,
+		},
+		{
+			name: "PodGroup has no controller owner",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.OwnerReferences[0].Controller = ptr.To(false)
+			},
+			wantError: true,
+		},
+		{
+			name: "PodGroup owner has an unexpected API version",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.OwnerReferences[0].APIVersion = "example.com/v1"
+			},
+			wantError: true,
+		},
+		{
+			name: "PodGroup owner has an unexpected kind",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.OwnerReferences[0].Kind = "ConfigMap"
+			},
+			wantError: true,
+		},
+		{
+			name: "PodGroup belongs to another Pod",
+			mutate: func(pg *volcanov1beta1.PodGroup) {
+				pg.OwnerReferences[0].Name = "another-leader"
+			},
+			wantError: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pg := &volcanov1beta1.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            leader.Annotations[volcanov1beta1.KubeGroupNameAnnotationKey],
+					Namespace:       leader.Namespace,
+					UID:             "existing-podgroup-uid",
+					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(leader, corev1.SchemeGroupVersion.WithKind("Pod"))},
+				},
+				Spec: volcanov1beta1.PodGroupSpec{MinMember: 1},
+			}
+			if tt.mutate != nil {
+				tt.mutate(pg)
+			}
+			c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pg).Build()
+			var before volcanov1beta1.PodGroup
+			require.NoError(t, c.Get(context.Background(), client.ObjectKeyFromObject(pg), &before))
+
+			err := NewVolcanoProvider(c).CreatePodGroupIfNotExists(context.Background(), lws, leader)
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantWaiting, errors.Is(err, ErrPodGroupNotReady))
+			var after volcanov1beta1.PodGroup
+			require.NoError(t, c.Get(context.Background(), client.ObjectKeyFromObject(pg), &after))
+			assert.Empty(t, cmp.Diff(before, after), "existing PodGroups must not be adopted or modified")
+		})
+	}
+}
+
+func TestVolcanoProvider_CreateErrors(t *testing.T) {
+	leader := createTestLeaderPod("test-lws-0", "default", "test-lws", "0", "revision")
+	lws := &leaderworkerset.LeaderWorkerSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-lws", Namespace: "default"},
+		Spec: leaderworkerset.LeaderWorkerSetSpec{
+			LeaderWorkerTemplate: leaderworkerset.LeaderWorkerTemplate{Size: ptr.To[int32](1)},
+		},
+	}
+	tests := map[string]error{
+		"cache has not observed an existing PodGroup": apierrors.NewAlreadyExists(volcanov1beta1.Resource("podgroups"), leader.Annotations[volcanov1beta1.KubeGroupNameAnnotationKey]),
+		"unexpected API failure":                      errors.New("unexpected create error"),
+	}
+	for name, createError := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := fake.NewClientBuilder().WithScheme(scheme).WithInterceptorFuncs(interceptor.Funcs{
+				Create: func(context.Context, client.WithWatch, client.Object, ...client.CreateOption) error {
+					return createError
+				},
+			}).Build()
+			err := NewVolcanoProvider(c).CreatePodGroupIfNotExists(context.Background(), lws, leader)
+			require.ErrorIs(t, err, createError)
+			assert.NotErrorIs(t, err, ErrPodGroupNotReady)
 		})
 	}
 }

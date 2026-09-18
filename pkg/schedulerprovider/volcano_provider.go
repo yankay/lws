@@ -18,6 +18,7 @@ package schedulerprovider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -95,6 +96,16 @@ func (v *VolcanoProvider) CreatePodGroupIfNotExists(ctx context.Context, lws *le
 			return err
 		}
 		log.V(2).Info("Created PodGroup for LeaderWorkerSet")
+	}
+
+	owner := metav1.GetControllerOf(&pg)
+	if owner == nil || owner.APIVersion != corev1.SchemeGroupVersion.String() || owner.Kind != "Pod" || owner.Name != leaderPod.Name {
+		return fmt.Errorf("podgroup %s/%s has an unexpected controller owner: %v", pg.Namespace, pg.Name, owner)
+	}
+	// Names are reused across leader replacements. Even before deletion is visible
+	// in the cache, a PodGroup owned by the previous leader must not be reused.
+	if owner.UID != leaderPod.UID || pg.DeletionTimestamp != nil {
+		return fmt.Errorf("%w: waiting for podgroup %s/%s to be deleted", ErrPodGroupNotReady, pg.Namespace, pg.Name)
 	}
 
 	return nil

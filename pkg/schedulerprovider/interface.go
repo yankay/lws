@@ -18,6 +18,7 @@ package schedulerprovider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,8 @@ import (
 
 var (
 	SupportedSchedulerProviders = sets.New("volcano")
+	// ErrPodGroupNotReady indicates that reconciliation must wait for an existing PodGroup to be deleted.
+	ErrPodGroupNotReady = errors.New("podgroup is not ready")
 )
 
 const (
@@ -37,7 +40,8 @@ const (
 
 // SchedulerProvider defines the interface for managing pod group resources
 type SchedulerProvider interface {
-	// CreatePodGroupIfNotExists creates a PodGroup if it doesn't exist, called by pod controller
+	// CreatePodGroupIfNotExists creates a PodGroup if it doesn't exist, called by pod controller.
+	// It returns ErrPodGroupNotReady when an existing PodGroup must finish deletion first.
 	CreatePodGroupIfNotExists(ctx context.Context, lws *leaderworkerset.LeaderWorkerSet, leaderPod *corev1.Pod) error
 
 	// InjectPodGroupMetadata sets pod meta for PodGroup association, called by webhook
