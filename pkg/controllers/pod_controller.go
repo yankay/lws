@@ -53,6 +53,8 @@ import (
 	statefulsetutils "sigs.k8s.io/lws/pkg/utils/statefulset"
 )
 
+const podGroupRequeueDelay = 2 * time.Second
+
 // PodReconciler reconciles a LeaderWorkerSet object
 type PodReconciler struct {
 	client.Client
@@ -165,6 +167,10 @@ func (r *PodReconciler) reconcilePod(ctx context.Context, req podReconcileReques
 	if r.SchedulerProvider != nil {
 		err = r.SchedulerProvider.CreatePodGroupIfNotExists(ctx, &leaderWorkerSet, &pod)
 		if err != nil {
+			if errors.Is(err, schedulerprovider.ErrPodGroupNotReady) {
+				log.V(2).Info("Waiting for the previous PodGroup to be deleted")
+				return ctrl.Result{RequeueAfter: podGroupRequeueDelay}, nil
+			}
 			return ctrl.Result{}, err
 		}
 	}
